@@ -59,3 +59,20 @@ func priorityFunction(mapFn algorithm.PriorityMapFunction, reduceFn algorithm.Pr
 		return result, nil
 	}
 }
+
+func makeGPUNode(node string, milliCPU, memory, numGPU int64, gpuModel string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: node},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:        *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory:     *resource.NewQuantity(memory, resource.BinarySI),
+				nvidiaGPUResourceName: *resource.NewQuantity(numGPU, resource.DecimalSI),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:        *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory:     *resource.NewQuantity(memory, resource.BinarySI),
+				nvidiaGPUResourceName: *resource.NewQuantity(numGPU, resource.DecimalSI)},
+		},
+	}
+}

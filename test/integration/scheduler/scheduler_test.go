@@ -759,3 +759,96 @@ func TestSchedulerInformers(t *testing.T) {
 		cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	}
 }
+
+// TestSchedulerInformers tests that scheduler receives informer events and updates its cache when
+// pods are scheduled by other schedulers.
+func TestSchedulerInformers(t *testing.T) {
+	// Initialize scheduler.
+	context := initTest(t, "scheduler-informer")
+	defer cleanupTest(t, context)
+	cs := context.clientSet
+
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
+	}
+	defaultNodeRes := &v1.ResourceList{
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(500, resource.BinarySI),
+	}
+
+	type nodeConfig struct {
+		name string
+		res  *v1.ResourceList
+	}
+
+	tests := []struct {
+		description         string
+		nodes               []*nodeConfig
+		existingPods        []*v1.Pod
+		pod                 *v1.Pod
+		preemptedPodIndexes map[int]struct{}
+	}{
+		{
+			description: "Pod cannot be scheduled when node is occupied by pods scheduled by other schedulers",
+			nodes:       []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
+			existingPods: []*v1.Pod{
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:          "pod1",
+					Namespace:     context.ns.Name,
+					Resources:     defaultPodRes,
+					Labels:        map[string]string{"foo": "bar"},
+					NodeName:      "node-1",
+					SchedulerName: "foo-scheduler",
+				}),
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:          "pod2",
+					Namespace:     context.ns.Name,
+					Resources:     defaultPodRes,
+					Labels:        map[string]string{"foo": "bar"},
+					NodeName:      "node-1",
+					SchedulerName: "bar-scheduler",
+				}),
+			},
+			pod: initPausePod(cs, &pausePodConfig{
+				Name:      "unschedulable-pod",
+				Namespace: context.ns.Name,
+				Resources: defaultPodRes,
+			}),
+			preemptedPodIndexes: map[int]struct{}{2: {}},
+		},
+	}
+
+	for _, test := range tests {
+		for _, nodeConf := range test.nodes {
+			_, err := createNode(cs, nodeConf.name, nodeConf.res)
+			if err != nil {
+				t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
+			}
+		}
+
+		pods := make([]*v1.Pod, len(test.existingPods))
+		var err error
+		// Create and run existingPods.
+		for i, p := range test.existingPods {
+			if pods[i], err = runPausePod(cs, p); err != nil {
+				t.Fatalf("Test [%v]: Error running pause pod: %v", test.description, err)
+			}
+		}
+		// Create the new "pod".
+		unschedulable, err := createPausePod(cs, test.pod)
+		if err != nil {
+			t.Errorf("Error while creating new pod: %v", err)
+		}
+		if err := wait.Poll(pollInterval, 30*time.Second, podUnschedulable(cs, test.pod.Namespace, test.pod.Name)); err != nil {
+			t.Errorf("Pod %v got scheduled: %v", unschedulable.Name, err)
+		}
+
+		// Cleanup
+		pods = append(pods, unschedulable)
+		cleanupPods(cs, t, pods)
+		cs.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).DeleteCollection(nil, metav1.ListOptions{})
+		cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	}
+}

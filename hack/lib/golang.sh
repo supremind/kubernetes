@@ -452,7 +452,7 @@ kube::golang::place_bins() {
     local platform_src="/${platform//\//_}"
     if [[ "$platform" == "$host_platform" ]]; then
       platform_src=""
-      rm -f "${THIS_PLATFORM_BIN}"
+      rm -rf "${THIS_PLATFORM_BIN}"
       ln -s "${KUBE_OUTPUT_BINPATH}/${platform}" "${THIS_PLATFORM_BIN}"
     fi
 
