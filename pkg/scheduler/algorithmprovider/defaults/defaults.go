@@ -33,6 +33,9 @@ import (
 const (
 	// ClusterAutoscalerProvider defines the default autoscaler provider
 	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
+
+	// AVAProvider uses custom gpu scheduling strategy
+	AVAProvider = "AVAProvider"
 )
 
 func init() {
@@ -101,6 +104,10 @@ func init() {
 		priorities.RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap,
 		nil,
 		1)
+
+	// LeastRemainedGPUPriority prefers nodes with less remained gpu after scheduling.
+	// Keepping free gpus together on less nodes allows feature workloads requesting large number of gpus be scheduled.
+	factory.RegisterPriorityFunction2("LeastRemainedGPUPriority", priorities.LeastRemainedGPUPriorityMap, nil, 100)
 }
 
 func defaultPredicates() sets.String {
@@ -226,6 +233,8 @@ func registerAlgorithmProvider(predSet, priSet sets.String) {
 	// Cluster autoscaler friendly scheduling algorithm.
 	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, predSet,
 		copyAndReplace(priSet, "LeastRequestedPriority", "MostRequestedPriority"))
+
+	factory.RegisterAlgorithmProvider(AVAProvider, predSet, copyAndAdd(priSet, "LeastRemainedGPUPriority"))
 }
 
 func defaultPriorities() sets.String {
@@ -279,5 +288,11 @@ func copyAndReplace(set sets.String, replaceWhat, replaceWith string) sets.Strin
 		result.Delete(replaceWhat)
 		result.Insert(replaceWith)
 	}
+	return result
+}
+
+func copyAndAdd(set sets.String, item string) sets.String {
+	result := sets.NewString(set.List()...)
+	result.Insert(item)
 	return result
 }
