@@ -3106,6 +3106,10 @@
 			"Rev": "e7cb7fa329f456b3855136a2642b197bad7366ba"
 		},
 		{
+			"ImportPath": "github.com/supremind/gpu-monitoring-tools/bindings/go/nvml",
+			"Rev": "8b220e70bb25f5e13fa86cbc1249aa81fc2b520f"
+		},
+		{
 			"ImportPath": "github.com/tmc/grpc-websocket-proxy/wsproxy",
 			"Rev": "89b8d40f7ca833297db804fcb3be53a76d01c238"
 		},
