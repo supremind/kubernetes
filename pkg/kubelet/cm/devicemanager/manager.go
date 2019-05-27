@@ -615,7 +615,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if int(available.Len()) < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
-	allocated := available.UnsortedList()[:needed]
+	allocated := calcAllocated(resource, needed, devicesInUse, available)
 	// Updates m.allocatedDevices with allocated devices to prevent them
 	// from being allocated to other pods/containers, given that we are
 	// not holding lock during the rpc call.
