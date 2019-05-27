@@ -57,7 +57,7 @@ func setupRank() bool {
 	nvml.Init()
 	defer nvml.Shutdown()
 
-	gpus, links, costs = nil, nil, nil
+	gpus, links = nil, map[string](map[string]nvml.P2PLinkType){}
 	count, err := nvml.GetDeviceCount()
 	if err != nil {
 		return false
